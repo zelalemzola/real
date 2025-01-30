@@ -1,90 +1,201 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import axios from "axios"
 import Link from "next/link"
-import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
+import { Slider } from "@/components/ui/slider"
+import { BedDouble, Bath, MapPin, DollarSign } from "lucide-react"
 
 export default function Home() {
   const [properties, setProperties] = useState([])
-  const [filters, setFilters] = useState({})
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [filters, setFilters] = useState({
+    location: "",
+    propertyType: "all", // Changed from "" to "all"
+    minPrice: 0,
+    maxPrice: 1000000000000,
+    bedrooms: "any", // Changed from "" to "any"
+  })
+
+  const fetchProperties = useCallback(async () => {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      location: filters.location,
+      minPrice: filters.minPrice.toString(),
+      maxPrice: filters.maxPrice.toString(),
+    })
+
+    if (filters.propertyType !== "all") {
+      params.append("propertyType", filters.propertyType)
+    }
+    if (filters.bedrooms !== "any") {
+      params.append("bedrooms", filters.bedrooms)
+    }
+
+    try {
+      const response = await axios.get(`/api/properties?${params}`)
+      setProperties(response.data.properties)
+      setTotalPages(Math.ceil(response.data.total / response.data.limit))
+    } catch (error) {
+      console.error("Failed to fetch properties:", error)
+    }
+  }, [page, filters])
 
   useEffect(() => {
     fetchProperties()
-  }, []) // Updated dependency array
+  }, [fetchProperties])
 
-  const fetchProperties = async () => {
-    try {
-      const params = new URLSearchParams(filters)
-      const response = await axios.get(`/api/properties?${params}`)
-      setProperties(response.data.properties)
-    } catch (error) {
-      console.error("Error fetching properties:", error)
-    }
+  const handleFilterChange = (name, value) => {
+    setFilters((prev) => ({ ...prev, [name]: value }))
+    setPage(1)
+  }
+
+  const handlePriceChange = (value) => {
+    setFilters((prev) => ({ ...prev, minPrice: value[0], maxPrice: value[1] }))
+    setPage(1)
   }
 
   return (
-    <div className="container mx-auto p-4">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        <Input
-          placeholder="Search by location"
-          onChange={(e) => setFilters({ ...filters, location: e.target.value })}
-        />
-        <Select onValueChange={(value) => setFilters({ ...filters, propertyType: value })}>
-          <SelectTrigger>
-            <SelectValue placeholder="Property Type" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="Apartment">Apartment</SelectItem>
-            <SelectItem value="Villa">Villa</SelectItem>
-            <SelectItem value="Office">Office</SelectItem>
-            <SelectItem value="Land">Land</SelectItem>
-            <SelectItem value="Commercial">Commercial</SelectItem>
-          </SelectContent>
-        </Select>
-        <Input
-          type="number"
-          placeholder="Min Price"
-          onChange={(e) => setFilters({ ...filters, minPrice: e.target.value })}
-        />
-        <Input
-          type="number"
-          placeholder="Max Price"
-          onChange={(e) => setFilters({ ...filters, maxPrice: e.target.value })}
-        />
+    <div className="container mx-auto p-4 space-y-8">
+      <h1 className="text-4xl font-bold text-center mb-8">Discover Your Dream Property</h1>
+
+      {/* Filter Section */}
+      <div className="bg-gray-100 p-6 rounded-lg shadow-md">
+        <h2 className="text-2xl font-semibold mb-4">Filter Properties</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Input
+            placeholder="Location"
+            value={filters.location}
+            onChange={(e) => handleFilterChange("location", e.target.value)}
+          />
+          
+          {/* Property Type Filter */}
+          <Select value={filters.propertyType} onValueChange={(value) => handleFilterChange("propertyType", value)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Property Type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="Apartment">Apartment</SelectItem>
+              <SelectItem value="Villa">Villa</SelectItem>
+              <SelectItem value="Office">Office</SelectItem>
+              <SelectItem value="Land">Land</SelectItem>
+              <SelectItem value="Commercial">Commercial</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Bedrooms Filter */}
+          <Select value={filters.bedrooms} onValueChange={(value) => handleFilterChange("bedrooms", value)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Bedrooms" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="any">Any</SelectItem>
+              <SelectItem value="1">1+</SelectItem>
+              <SelectItem value="2">2+</SelectItem>
+              <SelectItem value="3">3+</SelectItem>
+              <SelectItem value="4">4+</SelectItem>
+              <SelectItem value="5">5+</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Price Range Filter */}
+          <div>
+            <p className="mb-2">
+              Price Range: ${filters.minPrice.toLocaleString()} - ${filters.maxPrice.toLocaleString()}
+            </p>
+            <Slider
+              min={0}
+              max={1000000}
+              step={10000}
+              value={[filters.minPrice, filters.maxPrice]}
+              onValueChange={handlePriceChange}
+            />
+          </div>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+      {/* Property List */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {properties.map((property) => (
-          <Link key={property._id} href={`/properties/${property._id}`}>
-            <Card className="cursor-pointer hover:shadow-lg transition-shadow">
-              <CardContent className="p-0">
+          <Card key={property._id} className="overflow-hidden hover:shadow-lg transition-shadow duration-300">
+            <CardHeader className="p-0">
+              <div className="relative h-48">
                 <img
-                  src={property.images[0]?.url || "/placeholder.svg"}
+                  src={property.images[0]?.url || "/placeholder.jpg"}
                   alt={property.title}
-                  className="w-full h-48 object-cover"
+                  className="w-full h-full object-cover"
                 />
-              </CardContent>
-              <CardFooter className="flex flex-col items-start p-4">
-                <h3 className="font-semibold text-lg">{property.title}</h3>
-                <p className="text-muted-foreground">{property.location}</p>
-                <p className="text-lg font-bold mt-2">${property.price.toLocaleString()}</p>
-                <div className="flex gap-2 mt-2">
-                  {property.isForSale && (
-                    <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded">For Sale</span>
-                  )}
-                  {property.isForRent && (
-                    <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">For Rent</span>
-                  )}
+                <div className="absolute top-2 right-2 space-x-2">
+                  {property.isForSale && <Badge variant="secondary">For Sale</Badge>}
+                  {property.isForRent && <Badge variant="secondary">For Rent</Badge>}
                 </div>
-              </CardFooter>
-            </Card>
-          </Link>
+              </div>
+            </CardHeader>
+            <CardContent className="p-4">
+              <CardTitle className="text-xl mb-2 truncate">{property.title}</CardTitle>
+              <div className="flex items-center text-gray-600 mb-2">
+                <MapPin className="mr-1 h-4 w-4" />
+                <span className="text-sm truncate">{property.location}</span>
+              </div>
+              <div className="flex justify-between items-center mb-4">
+                <div className="flex items-center text-blue-600">
+                  <DollarSign className="mr-1 h-5 w-5" />
+                  <span className="font-bold">{property.price.toLocaleString()}</span>
+                </div>
+                <div className="flex space-x-2 text-gray-600">
+                  <span className="flex items-center">
+                    <BedDouble className="mr-1 h-4 w-4" />
+                    {property.bedrooms}
+                  </span>
+                  <span className="flex items-center">
+                    <Bath className="mr-1 h-4 w-4" />
+                    {property.bathrooms}
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter className="bg-gray-50 p-4">
+              <Link href={`/properties/${property._id}`} className="w-full">
+                <Button variant="outline" className="w-full">View Details</Button>
+              </Link>
+            </CardFooter>
+          </Card>
         ))}
       </div>
+
+      {/* Pagination */}
+      <Pagination className="mt-8">
+        <PaginationContent>
+          <PaginationItem>
+            <PaginationPrevious onClick={() => setPage((prev) => Math.max(prev - 1, 1))} />
+          </PaginationItem>
+          {[...Array(totalPages)].map((_, i) => (
+            <PaginationItem key={i}>
+              <PaginationLink onClick={() => setPage(i + 1)} isActive={page === i + 1}>
+                {i + 1}
+              </PaginationLink>
+            </PaginationItem>
+          ))}
+          <PaginationItem>
+            <PaginationNext onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))} />
+          </PaginationItem>
+        </PaginationContent>
+      </Pagination>
     </div>
   )
 }
-

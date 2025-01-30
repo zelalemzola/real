@@ -3,19 +3,18 @@ import { createUploadthing } from "uploadthing/next"
 const f = createUploadthing()
 
 export const ourFileRouter = {
-  propertyImage: f({
-    image: {
-      maxFileSize: "14MB",
-      maxFileCount: 10,
-    },
-  })
-    .middleware(() => {
-      return { timestamp: Date.now() }
+  imageUploader: f({ image: { maxFileSize: "4MB" } })
+    .middleware(async ({ req }) => {
+      // This code runs on your server before upload
+      // You can use this to authenticate
+      return { userId: "12345" } // This is a fake userId
     })
     .onUploadComplete(async ({ metadata, file }) => {
-      return { url: file.url, key: file.key }
+      // This code RUNS ON YOUR SERVER after upload
+      console.log("Upload complete for userId:", metadata.userId)
+      console.log("file url", file.url)
+
+      return { uploadedBy: metadata.userId }
     }),
 }
-
-export const { uploadRouter } = ourFileRouter
 
