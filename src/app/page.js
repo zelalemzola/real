@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/pagination"
 import { Slider } from "@/components/ui/slider"
 import { BedDouble, Bath, MapPin, DollarSign } from "lucide-react"
+import Navbar from "@/components/Navbar"
 
 export default function Home() {
   const [properties, setProperties] = useState([])
@@ -70,8 +71,10 @@ export default function Home() {
   }
 
   return (
-    <div className="container mx-auto p-4 space-y-8">
-      <h1 className="text-4xl font-bold text-center mb-8">Discover Your Dream Property</h1>
+    <div >
+      <Navbar/>
+      <div className="container mx-auto px-4 space-y-8">
+      <h1 className="text-4xl font-bold text-center mb-8 pt-[5%]">Discover Your Dream Property</h1>
 
       {/* Filter Section */}
       <div className="bg-gray-100 p-6 rounded-lg shadow-md">
@@ -196,6 +199,7 @@ export default function Home() {
           </PaginationItem>
         </PaginationContent>
       </Pagination>
+      </div>
     </div>
   )
 }
