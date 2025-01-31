@@ -1,8 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import axios from "axios"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -15,107 +16,166 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Trash2, Pencil, Plus } from "lucide-react"
+import { toast } from "@/hooks/use-toast"
 
 export default function AdminProperties() {
   const [properties, setProperties] = useState([])
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [filters, setFilters] = useState({})
+  const [isLoading, setIsLoading] = useState(false)
+  const router = useRouter()
+
+  const fetchProperties = useCallback(async () => {
+    setIsLoading(true)
+    const params = new URLSearchParams({ page, ...filters })
+    try {
+      const response = await axios.get(`/api/properties?${params}`)
+      setProperties(response.data.properties)
+      setTotalPages(Math.ceil(response.data.total / response.data.limit))
+    } catch (error) {
+      console.error("Failed to fetch properties:", error)
+      toast({
+        title: "Error",
+        description: "Failed to fetch properties. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }, [page, filters])
 
   useEffect(() => {
     fetchProperties()
-  }, [page, filters])
+  }, [fetchProperties])
 
-  const fetchProperties = async () => {
-    const params = new URLSearchParams({ page, ...filters })
-    const response = await axios.get(`/api/properties?${params}`)
-    setProperties(response.data.properties)
-    setTotalPages(Math.ceil(response.data.total / response.data.limit))
-  }
-
-  const handleFilterChange = (name, value) => {
-    setFilters((prev) => ({ ...prev, [name]: value }))
+  const handleFilterChange = (e) => {
+    setFilters({ ...filters, [e.target.name]: e.target.value })
     setPage(1)
   }
 
   const handleDelete = async (id) => {
-    await axios.delete(`/api/properties/${id}`)
-    fetchProperties()
+    if (window.confirm("Are you sure you want to delete this property?")) {
+      try {
+        await axios.delete(`/api/properties/${id}`)
+        fetchProperties()
+        toast({
+          title: "Success",
+          description: "Property deleted successfully",
+        })
+      } catch (error) {
+        console.error("Failed to delete property:", error)
+        toast({
+          title: "Error",
+          description: "Failed to delete property. Please try again.",
+          variant: "destructive",
+        })
+      }
+    }
   }
 
   return (
-    <div className="container mx-auto p-4">
-    <div className="flex items-center justify-between w-full py-4">
-      <h1 className="text-2xl font-bold mb-4">Admin </h1>
-      <Link href="/admin/properties/new">
-        <Button className="mt-4">Add New Property</Button>
-      </Link>
-      </div>
-      <div className="mb-4 flex space-x-2">
-        <Input placeholder="Filter by title" onChange={(e) => handleFilterChange("title", e.target.value)} />
-        <Select onValueChange={(value) => handleFilterChange("propertyType", value)}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Property Type" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="Apartment">Apartment</SelectItem>
-            <SelectItem value="Villa">Villa</SelectItem>
-            <SelectItem value="Office">Office</SelectItem>
-            <SelectItem value="Land">Land</SelectItem>
-            <SelectItem value="Commercial">Commercial</SelectItem>
-          </SelectContent>
-        </Select>
-        <Input type="number" placeholder="Min Price" onChange={(e) => handleFilterChange("minPrice", e.target.value)} />
-        <Input type="number" placeholder="Max Price" onChange={(e) => handleFilterChange("maxPrice", e.target.value)} />
-      </div>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Title</TableHead>
-            <TableHead>Price</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead>Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {properties.map((property) => (
-            <TableRow key={property._id}>
-              <TableCell>{property.title}</TableCell>
-              <TableCell>${property.price}</TableCell>
-              <TableCell>{property.propertyType}</TableCell>
-              <TableCell>
-                <Link href={`/admin/properties/${property._id}`}>
-                  <Button variant="outline" className="mr-2">
-                    Edit
-                  </Button>
-                </Link>
-                <Button variant="destructive" onClick={() => handleDelete(property._id)}>
-                  Delete
-                </Button>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      <Pagination className="mt-4">
-        <PaginationContent>
-          <PaginationItem>
-            <PaginationPrevious onClick={() => setPage((prev) => Math.max(prev - 1, 1))} />
-          </PaginationItem>
-          {[...Array(totalPages)].map((_, i) => (
-            <PaginationItem key={i}>
-              <PaginationLink onClick={() => setPage(i + 1)} isActive={page === i + 1}>
-                {i + 1}
-              </PaginationLink>
-            </PaginationItem>
-          ))}
-          <PaginationItem>
-            <PaginationNext onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))} />
-          </PaginationItem>
-        </PaginationContent>
-      </Pagination>
-    
+    <div className="space-y-8">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold flex justify-between items-center">
+            Admin Properties
+            <Link href="/admin/properties/new">
+              <Button>
+                <Plus className="mr-2 h-4 w-4" /> Add New Property
+              </Button>
+            </Link>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Input name="title" placeholder="Filter by title" onChange={handleFilterChange} />
+            <Select
+              name="propertyType"
+              onValueChange={(value) => handleFilterChange({ target: { name: "propertyType", value } })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="All Types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="Apartment">Apartment</SelectItem>
+                <SelectItem value="Villa">Villa</SelectItem>
+                <SelectItem value="Office">Office</SelectItem>
+                <SelectItem value="Land">Land</SelectItem>
+                <SelectItem value="Commercial">Commercial</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input name="location" placeholder="Filter by location" onChange={handleFilterChange} />
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Title</TableHead>
+                <TableHead>Price</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Location</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {properties.map((property) => (
+                <TableRow key={property._id}>
+                  <TableCell>{property.title}</TableCell>
+                  <TableCell>${property.price.toLocaleString()}</TableCell>
+                  <TableCell>{property.propertyType}</TableCell>
+                  <TableCell>{property.location}</TableCell>
+                  <TableCell>
+                    {property.isForSale && <Badge className="mr-1">For Sale</Badge>}
+                    {property.isForRent && <Badge variant="secondary">For Rent</Badge>}
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="mr-2"
+                      onClick={() => router.push(`/admin/properties/${property._id}`)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button variant="destructive" size="icon" onClick={() => handleDelete(property._id)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          {properties.length === 0 && !isLoading && (
+            <div className="text-center py-4">
+              <p className="text-gray-500">No properties found.</p>
+            </div>
+          )}
+          {totalPages > 1 && (
+            <Pagination className="mt-4">
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious onClick={() => setPage((prev) => Math.max(prev - 1, 1))} />
+                </PaginationItem>
+                {[...Array(totalPages).keys()].map((pageNumber) => (
+                  <PaginationItem key={pageNumber}>
+                    <PaginationLink onClick={() => setPage(pageNumber + 1)} isActive={page === pageNumber + 1}>
+                      {pageNumber + 1}
+                    </PaginationLink>
+                  </PaginationItem>
+                ))}
+                <PaginationItem>
+                  <PaginationNext onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))} />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }
